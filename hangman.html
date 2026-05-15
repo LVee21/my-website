@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hangman Game - Lorena Villalpando</title>
+
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Confetti -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+</head>
+
+<body>
+
+  <nav>
+    <a href="index.html">Home</a>
+    <a href="hangman.html">Hangman Game</a>
+  </nav>
+
+  <div class="container">
+    <h1>🎯 Hangman Game</h1>
+    <p>Select a difficulty or try the Daily Challenge!</p>
+
+    <select id="difficultySelect">
+      <option value="easy">Easy (8 lives, 60s)</option>
+      <option value="medium" selected>Medium (6 lives, 45s)</option>
+      <option value="hard">Hard (4 lives, 30s)</option>
+    </select>
+
+    <div id="score">Score: 0</div>
+    <div id="timer">Time: 0</div>
+
+    <!-- Animated Hangman -->
+    <div id="hangmanContainer">
+      <div class="gallow base"></div>
+      <div class="gallow pole"></div>
+      <div class="gallow top"></div>
+      <div class="gallow rope"></div>
+
+      <div class="man head hidden"></div>
+      <div class="man body hidden"></div>
+      <div class="man arm-left hidden"></div>
+      <div class="man arm-right hidden"></div>
+      <div class="man leg-left hidden"></div>
+      <div class="man leg-right hidden"></div>
+    </div>
+
+    <div id="wordDisplay"></div>
+    <div id="message"></div>
+    <div id="lives"></div>
+    <div id="letters"></div>
+
+    <button id="hintBtn">Hint</button>
+    <button id="dailyBtn">Daily Challenge</button>
+    <button id="restartBtn">Restart Game</button>
+  </div>
+
+  <script>
+    const easyWords = ["dog", "cat", "sun", "book", "tree", "blue", "happy", "music", "love", "smile"];
+    const mediumWords = ["finance", "austin", "travel", "mentor", "camping", "realestate", "longhorns", "graduation", "adventure", "sunshine"];
+    const hardWords = ["determination", "entrepreneur", "responsibility", "architecture", "psychology", "sustainability", "communication", "motivation", "resilience", "innovation"];
+
+    let selectedWord, guessedLetters, displayedWord;
+    let remainingLives, maxLives, timer, timeLeft;
+    let score = 0;
+    let hintUsed = false;
+
+    const wordDisplay = document.getElementById('wordDisplay');
+    const message = document.getElementById('message');
+    const livesDisplay = document.getElementById('lives');
+    const lettersDiv = document.getElementById('letters');
+    const restartBtn = document.getElementById('restartBtn');
+    const scoreDisplay = document.getElementById('score');
+    const timerDisplay = document.getElementById('timer');
+    const difficultySelect = document.getElementById('difficultySelect');
+    const hintBtn = document.getElementById('hintBtn');
+    const dailyBtn = document.getElementById('dailyBtn');
+
+    function getDailyWord() {
+      const today = new Date();
+      const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+      return hardWords[seed % hardWords.length];
+    }
+
+    function initGame() {
+      clearInterval(timer);
+
+      const difficulty = difficultySelect.value;
+
+      if (difficulty === "easy") {
+        maxLives = 8;
+        timeLeft = 60;
+        selectedWord = easyWords[Math.floor(Math.random() * easyWords.length)];
+      } else if (difficulty === "medium") {
+        maxLives = 6;
+        timeLeft = 45;
+        selectedWord = mediumWords[Math.floor(Math.random() * mediumWords.length)];
+      } else {
+        maxLives = 4;
+        timeLeft = 30;
+        selectedWord = hardWords[Math.floor(Math.random() * hardWords.length)];
+      }
+
+      remainingLives = maxLives;
+      guessedLetters = [];
+      displayedWord = "_".repeat(selectedWord.length);
+      hintUsed = false;
+
+      difficultySelect.disabled = false;
+
+      resetHangmanAnimation();
+      updateDisplay();
+      createKeyboard();
+      message.textContent = "";
+
+      startTimer();
+    }
+
+    function startDailyChallenge() {
+      clearInterval(timer);
+
+      selectedWord = getDailyWord();
+      guessedLetters = [];
+      displayedWord = "_".repeat(selectedWord.length);
+      hintUsed = false;
+
+      maxLives = 6;
+      remainingLives = 6;
+      timeLeft = 60;
+
+      difficultySelect.disabled = true;
+      message.textContent = "🔥 Daily Challenge Mode! 🔥";
+
+      resetHangmanAnimation();
+      updateDisplay();
+      createKeyboard();
+      startTimer();
+    }
+
+    function startTimer() {
+      timerDisplay.textContent = `Time: ${timeLeft}`;
+      timer = setInterval(() => {
+        timeLeft--;
+        timerDisplay.textContent = `Time: ${timeLeft}`;
+
+        if (timeLeft <= 0) {
+          clearInterval(timer);
+          message.textContent = "⏳ Time's up! You lost!";
+          wordDisplay.textContent = selectedWord.split("").join(" ");
+          disableKeyboard();
+        }
+      }, 1000);
+    }
+
+    function updateDisplay() {
+      wordDisplay.textContent = displayedWord.split("").join(" ");
+      livesDisplay.textContent = `Lives remaining: ${remainingLives}`;
+      updateHangmanAnimation();
+    }
+
+    function createKeyboard() {
+      lettersDiv.innerHTML = "";
+      for (let i = 65; i <= 90; i++) {
+        const letter = String.fromCharCode(i).toLowerCase();
+        const button = document.createElement("button");
+        button.textContent = letter;
+        button.onclick = () => handleGuess(letter, button);
+        lettersDiv.appendChild(button);
+      }
+    }
+
+    function handleGuess(letter, button) {
+      if (guessedLetters.includes(letter)) return;
+      guessedLetters.push(letter);
+      button.disabled = true;
+
+      if (selectedWord.includes(letter)) {
+        let newDisplay = "";
+        for (let i = 0; i < selectedWord.length; i++) {
+          newDisplay += guessedLetters.includes(selectedWord[i]) ? selectedWord[i] : "_";
+        }
+        displayedWord = newDisplay;
+      } else {
+        remainingLives--;
+      }
+
+      updateDisplay();
+      checkGameStatus();
+    }
+
+    function useHint() {
+      if (hintUsed) {
+        message.textContent = "You already used your hint!";
+        return;
+      }
+
+      hintUsed = true;
+      remainingLives--;
+
+      const hiddenIndexes = [];
+      for (let i = 0; i < selectedWord.length; i++) {
+        if (!guessedLetters.includes(selectedWord[i])) hiddenIndexes.push(i);
+      }
+
+      const randomIndex = hiddenIndexes[Math.floor(Math.random() * hiddenIndexes.length)];
+      const letterToReveal = selectedWord[randomIndex];
+
+      guessedLetters.push(letterToReveal);
+
+      let newDisplay = "";
+      for (let i = 0; i < selectedWord.length; i++) {
+        newDisplay += guessedLetters.includes(selectedWord[i]) ? selectedWord[i] : "_";
+      }
+      displayedWord = newDisplay;
+
+      updateDisplay();
+      checkGameStatus();
+    }
+
+    function checkGameStatus() {
+      if (!displayedWord.includes("_")) {
+        clearInterval(timer);
+        message.textContent = "🎉 You won! The word was: " + selectedWord;
+        score++;
+        scoreDisplay.textContent = "Score: " + score;
+        disableKeyboard();
+        launchConfetti();
+      } else if (remainingLives <= 0) {
+        clearInterval(timer);
+        message.textContent = "💀 You lost! The word was: " + selectedWord;
+        wordDisplay.textContent = selectedWord.split("").join(" ");
+        disableKeyboard();
+      }
+    }
+
+    function disableKeyboard() {
+      document.querySelectorAll("#letters button").forEach(btn => btn.disabled = true);
+    }
+
+    function launchConfetti() {
+      confetti({
+        particleCount: 200,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+    }
+
+    function resetHangmanAnimation() {
+      document.querySelectorAll(".man").forEach(p => {
+        p.classList.add("hidden");
+        p.classList.remove("visible");
+      });
+    }
+
+    function updateHangmanAnimation() {
+      const parts = [
+        document.querySelector(".man.head"),
+        document.querySelector(".man.body"),
+        document.querySelector(".man.arm-left"),
+        document.querySelector(".man.arm-right"),
+        document.querySelector(".man.leg-left"),
+        document.querySelector(".man.leg-right")
+      ];
+
+      const wrongGuesses = Math.max(0, maxLives - remainingLives);
+
+      parts.forEach((part, index) => {
+        if (index < wrongGuesses) {
+          part.classList.remove("hidden");
+          part.classList.add("visible");
+        } else {
+          part.classList.remove("visible");
+          part.classList.add("hidden");
+        }
+      });
+    }
+
+    restartBtn.addEventListener("click", initGame);
+    hintBtn.addEventListener("click", useHint);
+    dailyBtn.addEventListener("click", startDailyChallenge);
+
+    window.addEventListener("keydown", (e) => {
+      if (/^[a-zA-Z]$/.test(e.key)) {
+        const button = [...document.querySelectorAll("#letters button")]
+          .find(btn => btn.textContent === e.key.toLowerCase());
+        if (button && !button.disabled) handleGuess(e.key.toLowerCase(), button);
+      }
+    });
+
+    initGame();
+  </script>
+
+</body>
+</html>
